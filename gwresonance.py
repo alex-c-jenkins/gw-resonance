@@ -39,7 +39,7 @@ C_AU = 2.0039888041e-03      # Speed of light in AU per second
 # Internal constants.
 
 
-NMAX = 400       # Maximum harmonic implemented in ``km_funcs''
+NMAX = 20        # Maximum harmonic implemented in ``km_funcs''
 ECC_MIN = 0.001  # Minimum eccentricity implemented in ``km_funcs''
 ECC_MAX = 0.999  # Maximum eccentricity implemented in ``km_funcs''
 
@@ -567,13 +567,13 @@ def km_funcs(ecc):
 
     Returns
     -------
-    out : ndarray, shape (10, 20)
+    out : ndarray, shape (10, NMAX)
         Values of the KM coefficient functions.
 
     Notes
     -----
     An explanation of each of the 10 entries along the first axis is
-    given below.  The second axis corresponds to the first 20 harmonics
+    given below.  The second axis corresponds to the first NMAX harmonics
     of the binary period.
 
     out[0] is used for :math:`D^{(1)}_P`

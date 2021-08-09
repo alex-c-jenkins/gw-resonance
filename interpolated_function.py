@@ -10,6 +10,7 @@ __date__ = "2021/07"
 import numpy as np
 
 from os.path import isfile
+from tqdm import tqdm
 
 
 #-----------------------------------------------------------------------------#
@@ -102,17 +103,11 @@ class InterpolatedFunction(object):
             self._val_array = []
 
     def interpolate(self,
-                    verbose=True,
                     ):
         """Create a lookup table.
 
         If a filename is specified, the interpolating values will be written
         to that file.
-
-        Parameters
-        ----------
-        verbose : Bool, optional
-            Control the level of output.
         """
 
         if self.is_interpolated:
@@ -120,12 +115,9 @@ class InterpolatedFunction(object):
 
         self._val_array = []
 
-        for arg in self._arg_array:
+        for arg in tqdm(self._arg_array,
+                        desc="Creating lookup table for `" + self.file + "'"):
             val = self.func(arg)
-
-            if verbose:
-                print("interpolating function '{}'...\targ "
-                      "= {},\nval={}".format(self.__name__, arg, val))
 
             self._val_array.append(val)
 
