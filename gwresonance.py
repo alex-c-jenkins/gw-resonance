@@ -1747,9 +1747,9 @@ class Binary(object):
         return None
 
     def evolve_langevin(self,
-                        n_walks,
                         t_stop,
                         t_eval=None,
+                        n_walks=1,
                         ):
         """Evolve some number of random trajectories forward in time.
 
