@@ -3,9 +3,9 @@
 """Constraints on the stochastic GW background from laser ranging."""
 
 __author__ = ("Alexander C. Jenkins",)
-__contact__ = ("alexander.jenkins@kcl.ac.uk",)
-__version__ = "0.1"
-__date__ = "2021/07"
+__contact__ = ("alex.jenkins@ucl.ac.uk",)
+__version__ = "0.2"
+__date__ = "2023/03"
 
 import numpy as np
 
@@ -85,7 +85,8 @@ def likelihood_ratio(sgwb,
                      m2=3.69223e-08,
                      exclude_elements=None,
                      ):
-    """Calculate the likelihood ratio statistic for a binary pulsar.
+    """Calculate the likelihood ratio statistic for a laser-ranged
+    binary.
 
     Parameters
     ----------
@@ -164,7 +165,7 @@ def power_law_ul(alpha,
                  exclude_elements=None,
                  bracket=(-20., +20.),
                  ):
-    r"""Calculate a pulsar-timing upper limit on a power-law SGWB.
+    r"""Calculate a laser-ranging upper limit on a power-law SGWB.
 
     Outputs a forecast upper limit on :math:`\Omega_\mathrm{ref}`,
     where the SGWB spectrum is given by
@@ -253,7 +254,7 @@ def pi_curve(freqs,
              bracket=(-20., +20.),
              verbose=False,
              ):
-    """Calculate a binary pulsar's SGWB sensitivity curve.
+    """Calculate a laser-ranged binary's SGWB sensitivity curve.
 
     Returns the power-law integrated (PI) curve, as defined in [1]_.
 
@@ -346,7 +347,8 @@ def comb_ul(x_init,
             bracket=(-20., +20.),
             verbose=False,
             ):
-    """Calculate a binary pulsar's SGWB sensitivity at each harmonic.
+    """Calculate a laser-ranged binary's SGWB sensitivity at each
+    harmonic.
 
     Returns the SGWB upper limit corresponding to the discrete set of
     frequencies ``[f0, 2*f0, 3*f0, ..., nmax*f0]'', where ``f0'' is the
