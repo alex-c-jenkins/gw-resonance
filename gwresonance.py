@@ -3,9 +3,9 @@
 """Binary orbit evolution due to the stochastic GW background."""
 
 __author__ = ("Alexander C. Jenkins",)
-__contact__ = ("alexander.jenkins@kcl.ac.uk",)
-__version__ = "0.1"
-__date__ = "2021/07"
+__contact__ = ("alex.jenkins@ucl.ac.uk",)
+__version__ = "0.2"
+__date__ = "2023/03"
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -14,6 +14,7 @@ from inspect import isfunction
 from scipy.integrate import quad, solve_ivp
 from scipy.optimize import root_scalar
 from scipy.special import factorial, hyp2f1, jn, poch
+from tqdm import tqdm
 
 from interpolated_function import InterpolatedFunction
 
@@ -756,7 +757,7 @@ class Binary(object):
 
     Methods
     -------
-    evolve(t_step, t_eval)
+    evolve(t_stop, t_eval)
         Evolve the binary forward in time.
     v_sec(x)
         Calculate the deterministic drift for the orbital elements.
@@ -959,7 +960,7 @@ class Binary(object):
         x_init[x_init == None] = 0.
 
         self.t = [0.]
-        self._y = list(x_init) + [0.]*27
+        self._y = np.array(list(x_init) + [0.]*27)
 
         self.elements = self.elements[self.mask]
         self.abbrevs = self.abbrevs[self.mask]
@@ -981,6 +982,8 @@ class Binary(object):
         self.sgwb = sgwb
         self.lookback = lookback
         self.nmax = min(int(np.floor(v_rms(per, self.mtot) ** -1.)), NMAX)
+
+        self.walks = None
 
     def v_sec(self, x):
         """Calculate the deterministic drift for the orbital elements.
@@ -1576,40 +1579,95 @@ class Binary(object):
         ----------
         t : float
             Time in seconds.
-        y : array, shape (33,)
+        y : array, shape (33, ) or (33, n)
             State vector of the system. First six elements are the
             deterministic orbital elements ``x0'', next six elements
             are the mean stochastic corrections ``dx'', and the
             remaining elements are the upper triangle of the covariance
             matrix ``cov'' (the lower triangle is redundant and is
-            excluded for efficiency).
+            excluded for efficiency). If shape is ``(33, n)'', this
+            represents ``n'' different binaries.
 
         Returns
         -------
-        array, shape(33,)
+        array, shape (33, ) or (33, n)
             Time derivative of the state vector.
         """
 
+        if len(y.shape) == 1:
+            y = np.transpose([y])
+
+        n = y.shape[-1]
         x0 = np.array(y[:6])
         dx = np.array(y[6:12])
-        cov = np.zeros((6, 6))
+        cov = np.zeros((6, 6, n))
         cov[np.triu_indices(6)] = y[12:]
-        cov += np.tril(np.transpose(cov), -1)
+        cov += np.transpose(np.tril(np.transpose(cov), -1), axes=[1, 2, 0])
 
-        dx0dt  = list(self.v_sec(x0))
-        ddxdt  = list(self.km1(x0, t=t) + dx.dot(self.dv_sec(x0))
-                      + 0.5*np.tensordot(cov, self.ddv_sec(x0)))
-        dcovdt = list(
-            (2.*self.km2(x0, t=t) + cov.dot(self.dv_sec(x0))
-             + cov.dot(self.dv_sec(x0)).transpose())[np.triu_indices(6)])
+        dydt = np.zeros_like(y)
+        dydt[:6] = np.transpose([self.v_sec(x0[:, i]) for i in range(n)])
+        dydt[6:12] = np.transpose([self.km1(x0[:, i], t=t)
+                                   + dx[:, i].dot(self.dv_sec(x0[:, i]))
+                                   + 0.5*np.tensordot(cov[:, :, i],
+                                                      self.ddv_sec(x0[:, i]))
+                                   for i in range(n)])
+        dydt[12:] = np.transpose([(
+            2.*self.km2(x0[:, 0], t=t) + cov[:, :, 0].dot(self.dv_sec(x0[:, 0]))
+            + np.transpose(cov[:, :, 0].dot(self.dv_sec(x0[:, 0])))
+            )[np.triu_indices(6)]
+            for i in range(n)])
+        
+        if n == 1:
+            dydt = dydt[:, 0]
 
-        return np.array(dx0dt + ddxdt + dcovdt, dtype=float)
+        return dydt
+    
+    def _rk4_vec(self, t, y, h):
+        """Internal function that evolves a vector of binaries
+        forwards using RK4.
 
-    def evolve(self,
-               t_step,
-               t_eval=None,
-               ):
-        """Evolve the binary forward in time.
+        Parameters
+        ----------
+        t : float
+            Time in seconds.
+        y : array, shape (33, ) or (33, n)
+            State vector of the system. First six elements are the
+            deterministic orbital elements ``x0'', next six elements
+            are the mean stochastic corrections ``dx'', and the
+            remaining elements are the upper triangle of the covariance
+            matrix ``cov'' (the lower triangle is redundant and is
+            excluded for efficiency). If shape is ``(33, n)'', this
+            represents ``n'' different binaries.
+        h : float
+            Size of the forwards time step, in seconds.
+
+        Returns
+        -------
+        array, shape (33, ) or (33, n)
+            State vector, evolved forward by time ``h''.
+        """
+
+        out = y
+
+        k = self._dydt(t, y)
+        out += h / 6. * k
+
+        k = self._dydt(t + 0.5*h, y + 0.5*h*k)
+        out += h / 3. * k
+
+        k = self._dydt(t + 0.5*h, y + 0.5*h*k)
+        out += h / 3. * k
+
+        k = self._dydt(t + h, y + h*k)
+        out += h / 6. * k
+
+        return out
+
+    def evolve_fokker_planck(self,
+                             t_stop,
+                             t_eval=None,
+                             ):
+        """Evolve the binary's distribution function forward in time.
 
         Solves the coupled set of ODEs governing the secular evolution
         of the mean vector and covariance matrix of the orbital
@@ -1617,31 +1675,44 @@ class Binary(object):
         The resulting orbital elements are appended to the ``x0'',
         ``dx'', and ``cov'' attributes of the class instance.
 
+        !! Calling this will erase any previous time evolution !!
+
         Parameters
         ----------
-        t_step : float
-            Timespan over which the binary should evolve, in seconds.
+        t_stop : float
+            Time at which to stop the evolution, in seconds.
         t_eval : array_like, optional
             Array of times at which the values of the orbital elements
-            should be calculated.  Should consist of floats with values
-            between ``self.t[-1]'' and ``self.t[-1] + t_step''.
+            should be calculated.  Should consist of floats, starting
+            with ``0.'' and ending with ``t_stop''.
         """
 
-        if self.lookback > 0. and self.t[-1] + t_step > self.lookback:
+        if self.t[-1] > 0.:
+            self.__init__(self.sgwb,
+                          self.x0[0],
+                          self.m1,
+                          self.m2,
+                          self.low_ecc,
+                          self.lookback,
+                          )
+
+        if self.lookback > 0. and t_stop > self.lookback:
             raise ValueError("Cannot evolve the binary forward to negative"
                              "lookback times. The evolution must end at the"
                              "present day.")
 
         if t_eval is None:
             t_eval = np.linspace(self.t[-1],
-                                 self.t[-1] + t_step,
+                                 self.t[-1] + t_stop,
                                  1000)
 
         sol = solve_ivp(self._dydt,
                         [self.t[-1],
-                         self.t[-1] + t_step],
+                         self.t[-1] + t_stop],
                         self._y,
-                        t_eval=t_eval)
+                        t_eval=t_eval,
+                        vectorized=True,
+                        method='DOP853')
 
         self._y = sol.y[:, -1]
 
@@ -1672,6 +1743,68 @@ class Binary(object):
           np.diag_indices(self._n_el)[1]] *= 0.5
         self.cov = np.array(list(self.cov) + list(C.transpose()),
                             dtype=float)
+
+        return None
+
+    def evolve_langevin(self,
+                        t_stop,
+                        t_eval=None,
+                        n_walks=1,
+                        ):
+        """Evolve some number of random trajectories forward in time.
+
+        Solves ``n_walks'' statistically independent realisations of
+        the Langevin equation for the binary. Each step is a draw from
+        the transition probability, found by solving the Fokker-Planck
+        equation for that interval. The resulting random walks are
+        saved in the ``walks'' attribute of the class instance, while
+        the corresponding time and mean orbital elements are saved in
+        ``t'' and ``x0''.
+
+        !! Calling this will erase any previous time evolution !!
+
+        Parameters
+        ----------
+        n_walks : int
+            Number of random walks to evolve.
+        t_stop : float
+            Time after the present at which to stop the evolution, in
+            seconds.
+        t_eval : array_like, optional
+            Array of times at which the values of the orbital elements
+            should be calculated.  Should consist of floats with values
+            between ``self.t[-1]'' and ``self.t[-1] + t_stop''.
+        """
+
+        if self.t[-1] > 0.:
+            self.__init__(self.sgwb,
+                          self.x0[0],
+                          self.m1,
+                          self.m2,
+                          self.low_ecc,
+                          self.lookback,
+                          )
+
+        if t_eval is None:
+            t_eval = np.linspace(0., t_stop, 1000)
+
+        nt = len(t_eval)
+        self.walks = np.zeros((nt, 6, n_walks))
+
+        for i in tqdm(range(nt-1),
+                      desc='Evolving random walks'):
+            y = np.zeros((33, n_walks))
+            y[:6] = np.outer(self.x0[i], np.ones(n_walks)) + self.walks[i]
+            y = self._rk4_vec(t_eval[i], y, t_eval[i+1]-t_eval[i])
+            self.t = np.append(self.t, [t_eval[i+1]])
+            self.x0 = np.append(self.x0, [np.average(y[:6], axis=-1)], axis=0)
+            dx = y[6:12]
+            cov = np.zeros((6, 6, n_walks))
+            cov[np.triu_indices(6)] = y[12:]
+            cov += np.transpose(np.tril(np.transpose(cov), -1), axes=[1, 2, 0])
+            self.walks[i+1] = self.walks[i] + np.array([
+                np.random.multivariate_normal(mean=dx[:,j], cov=cov[:,:,j])
+                for j in range(n_walks)]).transpose()
 
         return None
 

@@ -3,9 +3,9 @@
 """Constraints on the stochastic GW background from the Solar System."""
 
 __author__ = ("Alexander C. Jenkins",)
-__contact__ = ("alexander.jenkins@kcl.ac.uk",)
-__version__ = "0.1"
-__date__ = "2021/07"
+__contact__ = ("alex.jenkins@ucl.ac.uk",)
+__version__ = "0.2"
+__date__ = "2023/03"
 
 import numpy as np
 
@@ -154,7 +154,7 @@ def pi_curve(freqs,
              bracket=(0., 11.),
              verbose=False,
              ):
-    """Calculate a binary pulsar's SGWB sensitivity curve.
+    """Calculate a planet's SGWB sensitivity curve.
 
     Returns the power-law integrated (PI) curve, as defined in [1]_.
 

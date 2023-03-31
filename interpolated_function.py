@@ -3,9 +3,9 @@
 """Class for functions with lookup tables, for faster evaluation."""
 
 __author__ = ("Alexander C. Jenkins",)
-__contact__ = ("alexander.jenkins@kcl.ac.uk",)
-__version__ = "0.1"
-__date__ = "2021/07"
+__contact__ = ("alex.jenkins@ucl.ac.uk",)
+__version__ = "0.2"
+__date__ = "2023/03"
 
 import numpy as np
 
