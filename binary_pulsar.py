@@ -74,7 +74,7 @@ def fisher(x,
             out[0, 0] = (np.cos(2.*arg) / per**2.
                          + 2. * np.pi * t_obs * np.sin(2.*arg) / per**3.
                          + 8. / 3. * (np.pi*t_obs)**2. / per**4.)
-            out[0, 2] = np.cos(2.*arg) / np.tan(inc) / P
+            out[0, 2] = np.cos(2.*arg) / np.tan(inc) / per
             out[2, 0] = out[0, 2]
             out[0, 4] = -np.sin(2.*arg) / per - 2. * np.pi * t_obs / per**2.
             out[4, 0] = out[0, 4]
