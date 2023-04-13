@@ -65,7 +65,8 @@ def dx_rms(sgwb,
                low_ecc=low_ecc,
                lookback=lookback,
                )
-    b.evolve(lookback, t_eval=[0., lookback])
+    b.evolve_fokker_planck(lookback,
+                           t_eval=[0., lookback])
 
     return np.sqrt(b.dx[-1]**2. + b.cov[-1].diagonal())
 
