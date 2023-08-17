@@ -757,8 +757,10 @@ class Binary(object):
 
     Methods
     -------
-    evolve(t_stop, t_eval)
-        Evolve the binary forward in time.
+    evolve_fokker_planck(t_stop, t_eval)
+        Evolve the binary's distribution function forward in time.
+    evolve_langevin(t_stop, t_eval, n_walks)
+        Evolve random realisations of the binary forward in time.
     v_sec(x)
         Calculate the deterministic drift for the orbital elements.
     dv_sec(x)

@@ -129,8 +129,8 @@ def likelihood_ratio(sgwb,
                m1=m1,
                m2=m2,
                )
-    b.evolve(times[-1],
-             t_eval=times)
+    b.evolve_fokker_planck(times[-1],
+                           t_eval=times)
 
     out = 0.
 
